@@ -1,0 +1,32 @@
+[package]
+name = "silicon-kit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["ulquiorracode <ulquiorra.code@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/ulquiorracode/silicon-kit-rs"
+homepage = "https://github.com/ulquiorracode/silicon-kit-rs"
+description = "Safe, zero-overhead hardware silicon intrinsics, CPU feature tokens, streaming stores, F16C, and bit manipulation for Rust"
+readme = "README.md"
+keywords = ["simd", "intrinsics", "f16c", "streaming", "no-std"]
+categories = ["hardware-support", "no-std", "performance"]
+
+[features]
+default = ["std", "f16c", "streaming", "bits", "snorm", "crc32"]
+std = []
+f16c = []
+streaming = []
+bits = []
+snorm = []
+crc32 = []
+
+[dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support", "plotters"] }
+proptest = "1.12"
+
+[[bench]]
+name = "silicon_bench"
+harness = false

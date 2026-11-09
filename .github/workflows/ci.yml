@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Format Check
+        run: cargo fmt --all -- --check
+      - name: Clippy Warnings Check
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run Tests (all features)
+        run: cargo test --all-targets --all-features
+      - name: Run Tests (no-default-features / no_std check)
+        run: cargo check --no-default-features
