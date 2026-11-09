@@ -6,6 +6,7 @@
 
 /// 32-bit packed A2B10G10R10 signed normalized normal + tangent sign.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "zerocopy", derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::IntoBytes, zerocopy::KnownLayout))]
 #[repr(transparent)]
 pub struct PackedNormal10(pub u32);
 
@@ -15,8 +16,13 @@ impl PackedNormal10 {
     pub fn pack(normal: [f32; 3], tangent_sign: f32) -> Self {
         let clamp10 = |v: f32| -> u32 {
             let clamped = v.clamp(-1.0, 1.0);
-            let scaled = (clamped * 511.0).round() as i32;
-            (scaled & 0x3FF) as u32
+            let scaled_f = clamped * 511.0;
+            let rounded = if scaled_f >= 0.0 {
+                (scaled_f + 0.5) as i32
+            } else {
+                (scaled_f - 0.5) as i32
+            };
+            (rounded & 0x3FF) as u32
         };
         let x = clamp10(normal[0]);
         let y = clamp10(normal[1]);

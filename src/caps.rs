@@ -25,6 +25,7 @@ impl CpuCaps {
     /// In `#![no_std]` without runtime detection, reflects compile-time target features.
     #[inline]
     pub fn detect() -> Self {
+        #[allow(unused_mut)]
         let mut flags = 0u64;
 
         #[cfg(all(target_arch = "x86_64", feature = "std"))]

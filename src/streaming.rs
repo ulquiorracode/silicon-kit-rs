@@ -48,7 +48,7 @@ pub fn sfence() {
 
 /// Prefetch memory into CPU cache hierarchy.
 #[inline(always)]
-pub fn prefetch_read_l1(ptr: *const u8) {
+pub fn prefetch_read_l1<T>(ptr: *const T) {
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::x86_64::_mm_prefetch(ptr as *const i8, core::arch::x86_64::_MM_HINT_T0);
