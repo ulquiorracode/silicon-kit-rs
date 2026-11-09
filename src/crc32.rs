@@ -1,8 +1,8 @@
-//! Hardware-Accelerated CRC32-C (Castagnoli / SSE 4.2).
+//! Hardware-Accelerated CRC32-C (Castagnoli / SSE 4.2 / ARMv8 CRC32).
 
 use crate::caps::CpuCaps;
 
-/// Calculate CRC32-C using hardware instructions when available (`_mm_crc32_u64`),
+/// Calculate CRC32-C using hardware instructions when available (`_mm_crc32_u64` / ARM `__crc32cd`),
 /// falling back to software bitwise implementation.
 #[inline]
 pub fn crc32c(data: &[u8]) -> u32 {
@@ -10,13 +10,21 @@ pub fn crc32c(data: &[u8]) -> u32 {
     {
         #[cfg(target_feature = "sse4.2")]
         {
-            return unsafe { crc32c_hw(data) };
+            return unsafe { crc32c_hw_x86(data) };
         }
         #[cfg(not(target_feature = "sse4.2"))]
         {
             if CpuCaps::detect().has_sse42() {
-                return unsafe { crc32c_hw(data) };
+                return unsafe { crc32c_hw_x86(data) };
             }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        #[cfg(target_feature = "crc")]
+        {
+            return unsafe { crc32c_hw_arm(data) };
         }
     }
 
@@ -29,7 +37,15 @@ pub fn crc32c_with_caps(data: &[u8], caps: CpuCaps) -> u32 {
     #[cfg(target_arch = "x86_64")]
     {
         if caps.has_sse42() {
-            return unsafe { crc32c_hw(data) };
+            return unsafe { crc32c_hw_x86(data) };
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        #[cfg(target_feature = "crc")]
+        {
+            return unsafe { crc32c_hw_arm(data) };
         }
     }
 
@@ -38,7 +54,7 @@ pub fn crc32c_with_caps(data: &[u8], caps: CpuCaps) -> u32 {
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse4.2")]
-unsafe fn crc32c_hw(data: &[u8]) -> u32 {
+unsafe fn crc32c_hw_x86(data: &[u8]) -> u32 {
     use core::arch::x86_64::*;
     let mut crc = 0xFFFF_FFFFu64;
     let mut offset = 0;
@@ -57,6 +73,28 @@ unsafe fn crc32c_hw(data: &[u8]) -> u32 {
     }
 
     (!crc) as u32
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "crc")]
+unsafe fn crc32c_hw_arm(data: &[u8]) -> u32 {
+    use core::arch::aarch64::*;
+    let mut crc = 0xFFFF_FFFFu32;
+    let mut offset = 0;
+    let len = data.len();
+
+    while offset + 8 <= len {
+        let val = unsafe { core::ptr::read_unaligned(data.as_ptr().add(offset) as *const u64) };
+        crc = __crc32cd(crc, val);
+        offset += 8;
+    }
+
+    while offset < len {
+        crc = __crc32cb(crc, data[offset]);
+        offset += 1;
+    }
+
+    !crc
 }
 
 #[inline]

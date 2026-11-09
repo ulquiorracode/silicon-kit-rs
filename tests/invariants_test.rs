@@ -43,13 +43,19 @@ proptest! {
     }
 
     #[test]
-    fn test_bits_rank64_invariant(word: u64, bit: u8) {
-        let bit = (bit % 65) as u32;
-        let rank = bits::rank64(word, bit);
+    fn test_bits_pdep_pext_roundtrip(val: u64, mask: u64) {
+        let extracted = bits::pext64(val, mask);
+        let deposited = bits::pdep64(extracted, mask);
+        // Deposited bits must match original val where mask has 1s
+        prop_assert_eq!(deposited, val & mask);
+    }
 
-        let mask = if bit >= 64 { u64::MAX } else { (1u64 << bit) - 1 };
-        let expected = (word & mask).count_ones() as usize;
-        prop_assert_eq!(rank, expected);
+    #[test]
+    fn test_bits_lzcnt_tzcnt(val: u64) {
+        let tz = bits::tzcnt64(val);
+        let lz = bits::lzcnt64(val);
+        prop_assert_eq!(tz, val.trailing_zeros());
+        prop_assert_eq!(lz, val.leading_zeros());
     }
 
     #[test]
@@ -85,17 +91,17 @@ proptest! {
 
 #[test]
 fn test_streaming_copy_correctness() {
-    let sizes = [0, 1, 15, 16, 31, 32, 63, 64, 128, 1024, 65536];
+    let sizes = [0, 1, 15, 16, 31, 32, 63, 64, 128, 256, 1024, 65536];
     for &sz in &sizes {
         let src: Vec<u8> = (0..sz).map(|i| (i % 255) as u8).collect();
-        let mut dst = vec![0u8; sz + 64]; // ensure capacity & alignment test
+        // Test all possible destination alignments from 0 to 31 bytes
+        for misalign in 0..32 {
+            let mut dst = vec![0u8; sz + 64];
+            let dst_slice = &mut dst[misalign..misalign + sz];
 
-        // Find 32-byte aligned subslice in dst
-        let offset = (32 - (dst.as_ptr() as usize % 32)) % 32;
-        let dst_slice = &mut dst[offset..offset + sz];
-
-        stream_copy(&src, dst_slice);
-        assert_eq!(&src[..], dst_slice, "Mismatch at size {sz}");
+            stream_copy(&src, dst_slice);
+            assert_eq!(&src[..], dst_slice, "Mismatch at size {sz} with misalign {misalign}");
+        }
     }
 }
 
