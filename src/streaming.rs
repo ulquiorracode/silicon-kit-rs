@@ -54,7 +54,7 @@ pub fn sfence() {
     }
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        core::arch::aarch64::__dmb(core::arch::aarch64::barrier::ISHST);
+        core::arch::asm!("dmb ishst", options(nostack, preserves_flags));
     }
 }
 
