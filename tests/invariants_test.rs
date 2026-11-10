@@ -100,7 +100,11 @@ fn test_streaming_copy_correctness() {
             let dst_slice = &mut dst[misalign..misalign + sz];
 
             stream_copy(&src, dst_slice);
-            assert_eq!(&src[..], dst_slice, "Mismatch at size {sz} with misalign {misalign}");
+            assert_eq!(
+                &src[..],
+                dst_slice,
+                "Mismatch at size {sz} with misalign {misalign}"
+            );
         }
     }
 }
