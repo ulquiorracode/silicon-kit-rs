@@ -4,9 +4,13 @@
 //! enabled at compile-time (e.g. `-C target-cpu=native`), all checks fold to `true` at compile time.
 
 /// 64-bit bitmask representing detected hardware CPU capabilities.
+///
+/// Unforgeable capability token: fields are private to guarantee that capability
+/// flags cannot be fabricated by safe code. To construct a valid token, query hardware
+/// via [`CpuCaps::detect`], or use the safe zero-capability token [`CpuCaps::empty`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct CpuCaps {
-    pub flags: u64,
+    flags: u64,
 }
 
 impl CpuCaps {
@@ -18,6 +22,29 @@ impl CpuCaps {
     pub const POPCNT: u64 = 1 << 5;
     pub const SSE42: u64 = 1 << 6;
     pub const AVX512F: u64 = 1 << 7;
+
+    /// Return an empty capability token with no hardware features enabled.
+    #[inline(always)]
+    pub const fn empty() -> Self {
+        Self { flags: 0 }
+    }
+
+    /// Construct a capability token from raw flags.
+    ///
+    /// # Safety
+    /// The caller must ensure that the CPU actually supports all instruction set
+    /// features indicated by `flags`. Falsely asserting capabilities will cause
+    /// downstream intrinsic calls to execute invalid instructions, resulting in SIGILL crashes.
+    #[inline(always)]
+    pub const unsafe fn from_raw_flags(flags: u64) -> Self {
+        Self { flags }
+    }
+
+    /// Retrieve the raw 64-bit capability bitmask.
+    #[inline(always)]
+    pub const fn flags(&self) -> u64 {
+        self.flags
+    }
 
     /// Detect current CPU capabilities.
     ///
@@ -96,6 +123,11 @@ impl CpuCaps {
     }
 
     #[inline(always)]
+    pub const fn has_avx(&self) -> bool {
+        (self.flags & Self::AVX) != 0
+    }
+
+    #[inline(always)]
     pub const fn has_avx2(&self) -> bool {
         (self.flags & Self::AVX2) != 0
     }
@@ -103,6 +135,11 @@ impl CpuCaps {
     #[inline(always)]
     pub const fn has_f16c(&self) -> bool {
         (self.flags & Self::F16C) != 0
+    }
+
+    #[inline(always)]
+    pub const fn has_bmi1(&self) -> bool {
+        (self.flags & Self::BMI1) != 0
     }
 
     #[inline(always)]
@@ -118,5 +155,10 @@ impl CpuCaps {
     #[inline(always)]
     pub const fn has_sse42(&self) -> bool {
         (self.flags & Self::SSE42) != 0
+    }
+
+    #[inline(always)]
+    pub const fn has_avx512f(&self) -> bool {
+        (self.flags & Self::AVX512F) != 0
     }
 }

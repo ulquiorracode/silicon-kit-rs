@@ -1,6 +1,6 @@
 [package]
 name = "silicon-kit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["ulquiorracode <ulquiorra.code@gmail.com>"]
@@ -28,6 +28,10 @@ zerocopy = { version = "0.8", default-features = false, features = ["derive"], o
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support", "plotters"] }
 proptest = "1.12"
+
+[[test]]
+name = "invariants_test"
+required-features = ["f16c", "bits", "snorm", "streaming", "crc32", "std"]
 
 [[bench]]
 name = "silicon_bench"

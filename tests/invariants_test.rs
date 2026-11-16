@@ -36,9 +36,8 @@ proptest! {
         } else if val.is_infinite() {
             assert_eq!(hw, sw);
         } else {
-            // Allow 1 ULP difference at worst on boundary rounding
-            let diff = (hw as i32 - sw as i32).abs();
-            prop_assert!(diff <= 1, "HW {hw:#06x} vs SW {sw:#06x} for f32 {val}");
+            // Exact bit-for-bit parity with IEEE 754 Round to Nearest Ties to Even (RNE)
+            prop_assert_eq!(hw, sw, "HW {:#06x} vs SW {:#06x} for f32 {}", hw, sw, val);
         }
     }
 
@@ -118,5 +117,45 @@ fn test_cpu_caps_detection() {
         // On modern x86_64 desktop/laptop, sse4.2, popcnt, avx2 are expected
         assert!(caps.has_popcnt());
         assert!(caps.has_sse42());
+    }
+}
+
+#[test]
+fn test_cpu_caps_unforgeable_and_empty() {
+    let empty = CpuCaps::empty();
+    assert_eq!(empty.flags(), 0);
+    assert!(!empty.has_avx());
+    assert!(!empty.has_avx2());
+    assert!(!empty.has_f16c());
+    assert!(!empty.has_bmi1());
+    assert!(!empty.has_bmi2());
+    assert!(!empty.has_popcnt());
+    assert!(!empty.has_sse42());
+    assert!(!empty.has_avx512f());
+
+    let def = CpuCaps::default();
+    assert_eq!(def.flags(), 0);
+
+    // Unsafe creation allows explicit testing of feature dispatch
+    let forged = unsafe { CpuCaps::from_raw_flags(CpuCaps::F16C | CpuCaps::AVX2) };
+    assert!(forged.has_f16c());
+    assert!(forged.has_avx2());
+    assert!(!forged.has_bmi2());
+}
+
+#[test]
+fn test_f16c_exhaustive_unpack() {
+    for bits in 0..=u16::MAX {
+        let hw = f16c::unpack_f16(bits);
+        let sw = f16c::unpack_f16_scalar(bits);
+        if hw.is_nan() {
+            assert!(sw.is_nan(), "Expected NaN for bits {bits:#06x}");
+        } else {
+            assert_eq!(
+                hw.to_bits(),
+                sw.to_bits(),
+                "Mismatch at bits {bits:#06x}: HW {hw} vs SW {sw}"
+            );
+        }
     }
 }
