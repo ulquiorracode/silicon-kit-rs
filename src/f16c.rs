@@ -139,33 +139,43 @@ unsafe fn pack_f32x4_hw(vals: [f32; 4]) -> [u16; 4] {
 
 #[inline]
 pub fn pack_f32_scalar(val: f32) -> u16 {
-    let bits = val.to_bits();
-    let sign = (bits >> 16) & 0x8000;
-    let mantissa = bits & 0x007F_FFFF;
-    let exp = ((bits >> 23) & 0xFF) as i32;
+    let mut x = val.to_bits();
+    let x_sgn = x & 0x8000_0000;
+    x ^= x_sgn;
 
-    if exp == 255 {
-        if mantissa != 0 {
-            0x7E00 | ((mantissa >> 13) as u16)
+    let o = if x >= 0x4780_0000 {
+        if x > 0x7F80_0000 {
+            // NaN: preserve quiet NaN payload or set default qNaN bit
+            let mant = (x & 0x007F_FFFF) >> 13;
+            if mant == 0 {
+                0x7E00
+            } else {
+                0x7C00 | 0x0200 | (mant as u16)
+            }
         } else {
-            (sign | 0x7C00) as u16
+            // Infinity or overflow
+            0x7C00
         }
-    } else if exp > 142 {
-        (sign | 0x7C00) as u16
-    } else if exp < 113 {
-        if exp < 103 {
-            sign as u16
-        } else {
-            let m = mantissa | 0x0080_0000;
-            let shift = 113 - exp;
-            let half = m >> (shift + 13);
-            (sign | half) as u16
-        }
+    } else if x < 0x3880_0000 {
+        // Subnormal or zero in FP16 (< 2^-14).
+        // Magic value to align 10 mantissa bits at the bottom of float.
+        // As long as IEEE 754 addition is round-to-nearest-even, this aligns and rounds in one step:
+        // ((127 - 14) + (23 - 10)) << 23 = 126 << 23 = 0x3F00_0000
+        const DENORM_MAGIC: u32 = ((127 - 14) + (23 - 10)) << 23;
+        let f = f32::from_bits(x) + f32::from_bits(DENORM_MAGIC);
+        f.to_bits().wrapping_sub(DENORM_MAGIC) as u16
     } else {
-        let half_exp = ((exp - 127 + 15) as u32) << 10;
-        let half_mantissa = mantissa >> 13;
-        (sign | half_exp | half_mantissa) as u16
-    }
+        let mant_odd = (x >> 13) & 1;
+        // update exponent, rounding bias part 1
+        x = x
+            .wrapping_add(((-112i32) as u32) << 23)
+            .wrapping_add(0x0FFF);
+        // rounding bias part 2: ties to even
+        x = x.wrapping_add(mant_odd);
+        (x >> 13) as u16
+    };
+
+    ((x_sgn >> 16) as u16) | o
 }
 
 #[inline]
